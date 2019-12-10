@@ -24,10 +24,11 @@ type
 
   TTCPSocket = class;
 
-  TTCPHandler = class
-    FTerminated: Boolean;
+  TTCPHandler = class(TThread)
+  protected
     List: TList<TTCPSocket>;
-    procedure DoHandle;
+    procedure Execute; override;
+  public
     constructor Create;
     destructor Destroy; override;
     procedure Add(Socket: TTCPSocket);
@@ -119,15 +120,67 @@ type
   TSocketAccess = class(TSocket);
   TTCPSocketAccess = class(TTCPSocket);
 
-    procedure TTCPHandler.DoHandle;
-    begin
-      TThread.CreateAnonymousThread(
-      procedure
-      var
-        Socket: TTCPSocketAccess;
-      begin
+//    procedure TTCPHandler.DoHandle;
+//    begin
+//      TThread.CreateAnonymousThread(
+//      procedure
+//      var
+//        Socket: TTCPSocketAccess;
+//      begin
+//
+//        while not FTerminated do
+//        begin
+//
+//          TMonitor.Enter(Self);
+//          var A:=List.ToArray;
+//          TMonitor.Exit(Self);
+//
+//          for var S in A do
+//          try
+//            Socket:=TTCPSocketAccess(S);
+//
+//            if Socket.Connected then
+//            if TSocketAccess(Socket.Socket).WaitForData(0)=wrSignaled then
+//            case Socket.Socket.ReceiveLength of
+//           -1: beep;
+//            0:
+//
+//              TThread.Synchronize(nil,
+//
+//              procedure
+//              begin
+//                if Socket.Connected then
+//                begin
+//                  Socket.Disconnect;
+//                  Socket.DoClose;
+//                end;
+//              end)
+//
+//            else
+//              Socket.DoReceived;
+//            end;
+//
+//          except
+//          on E: ESocketError do Socket.DoHandleException(E);
+//          on E: Exception do Socket.HandleUIException(E);
+//          end;
+//
+//          //sleep(10);
+//
+//        end;
+//
+//        List.Free;
+//        List:=nil;
+//
+//      end).Start;
+//    end;
 
-        while not FTerminated do
+    procedure TTCPHandler.Execute;
+    var
+      Socket: TTCPSocketAccess;
+    begin
+
+        while not Terminated do
         begin
 
           TMonitor.Enter(Self);
@@ -139,12 +192,12 @@ type
             Socket:=TTCPSocketAccess(S);
 
             if Socket.Connected then
-            if TSocketAccess(Socket.Socket).WaitForData(10)=wrSignaled then
+            if TSocketAccess(Socket.Socket).WaitForData(0)=wrSignaled then
             case Socket.Socket.ReceiveLength of
            -1: beep;
             0:
 
-              TThread.Synchronize(nil,
+              Synchronize(nil,
 
               procedure
               begin
@@ -164,15 +217,14 @@ type
           on E: Exception do Socket.HandleUIException(E);
           end;
 
-          //sleep(10);
+          sleep(10);
 
         end;
 
         List.Free;
         List:=nil;
 
-      end).Start;
-    end;
+      end;
 
 {
     procedure TTCPHandler.DoHandle;
@@ -255,12 +307,17 @@ type
 
     constructor TTCPHandler.Create;
     begin
+      inherited Create(True);
       List:=TList<TTCPSocket>.Create;
     end;
 
     destructor TTCPHandler.Destroy;
     begin
-      FTerminated:=True;
+      Terminate;
+      WaitFor;
+      List.Free;
+      List:=nil;
+      inherited;
     end;
 
     procedure TTCPHandler.Add(Socket: TTCPSocket);
@@ -330,7 +387,7 @@ var NameID: Integer=0;
 class constructor TTCPSocket.Create;
 begin
   TCPHandler:=TTCPHandler.Create;
-  TCPHandler.DoHandle;
+  TCPHandler.Start;
 end;
 
 class destructor TTCPSocket.Destroy;
